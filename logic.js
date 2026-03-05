@@ -3,67 +3,97 @@ let Board = Array.from({ length: n }, () => Array(n).fill(" "));
 let GameStack = [];
 let human = "X";
 let aiPlayer = "O";
-let gameOver = false 
-document.querySelectorAll('.cell').forEach(cell=>{
-  cell.addEventListener('click' , handler);
+let gameOver = false;
+let MaxLength = 7;
+document.querySelectorAll('.cell').forEach(cell => {
+  cell.addEventListener('click', handler);
 })
 const reset = document.querySelector(".restart-btn");
 
-reset.addEventListener('click',  resetFun ) ;
+reset.addEventListener('click', resetFun);
 
 
-function resetFun(){
-   Board = Array.from({ length: n }, () => Array(n).fill(" "));
-   gameOver = false;
-   GameStack = [];
-    for(let i = 0 ; i<=9 ; i++){
-       
-document.querySelector(`[data-index="${i}"]`).textContent = " "
-    }  
-   return 
+function resetFun() {
+  Board = Array.from({ length: n }, () => Array(n).fill(" "));
+  gameOver = false;
+  GameStack = [];
+  for (let i = 0; i <= 9; i++) {
+
+    document.querySelector(`[data-index="${i}"]`).textContent = " "
+  }
+  return
 }
-function handler(e){
+function handler(e) {
 
-  if(gameOver) return;
+  if (gameOver) return;
 
   let index = Number(e.target.dataset.index)
 
   let row = Math.floor(index / 3)
   let col = index % 3
 
-  if(Board[row][col] !== " ") return
+  if (Board[row][col] !== " ") return
 
-  makeMove(row , col , human)
+  makeMove(row, col, human)
 }
-function makeMove(row,col,player){
-
+function makeMove(row, col, player) {
   Board[row][col] = player
-  GameStack.push([row,col])
-let index = row * 3 + col
-document.querySelector(`[data-index="${index}"]`).textContent = player
+  GameStack.push([row, col])
+  let index = row * 3 + col
+  document.querySelector(`[data-index="${index}"]`).textContent = player
+  if (GameStack.length > 7) {
+   let  removed = GameStack.shift();
+    let [r, c] = removed;
+    Board[r][c] = " ";
+    let index = r * 3 + c
+    document.querySelector(`[data-index="${index}"]`).textContent = " ";
+  }
 
-  if(letMeCheck(Board,GameStack)){
-  alert(player + " wins")
+  if (letMeCheck(Board, GameStack)) {
+    alert(player + " wins")
     resetFun()
-  return
-}
+    return
+  }
 
-if(isFull(Board)){
-  alert("Draw")
-  
-  resetFun()
-  return
-}
 
-  if(player === human){
+  if (player === human) {
     setTimeout(aiTurn, 200)
-    
+
   }
 }
+function makeMove2(row, col, player , Board , GameStack) {
 
-function aiTurn(){
-    let [row,col] = BestMove(Board,GameStack,aiPlayer)
-    makeMove(row ,col , aiPlayer)
+  GameStack.push([row, col]);
+  Board[row][col] = player;
+
+  let removed = null;
+
+  if (GameStack.length > 7) {
+    removed = GameStack.shift(); 
+    let [r, c] = removed;
+    let player = Board[r][c];
+    Board[r][c] = " ";
+    removed = [r ,  c , player];
+  }
+
+  return removed;
+}
+function undoStepBack(row , col ,removed ,borad ,GameStack){
+     borad[row][col] = " ";
+     GameStack.pop();
+     if(removed != null ){
+      let [r ,c  , player] = removed;
+      borad[r][c] = player;
+        GameStack.unshift([r,c]);  
+     }
+     return ;
+}
+
+
+
+function aiTurn() {
+  let [row, col] = BestMove(Board, GameStack, aiPlayer)
+  makeMove(row, col, aiPlayer)
 }
 
 
@@ -116,16 +146,14 @@ function isWinningMove(row, col, Board, character, k = 3) {
 function BestMove(Board, GameStack, player) {
   let bestScroce = -Infinity;
   let move = [-1, -1];
-
+   let map = new Map();
   for (let i = 0; i < Board.length; i++) {
     for (let j = 0; j < Board[i].length; j++) {
       if (Board[i][j] != " ") continue;
-      Board[i][j] = player;
-      GameStack.push([i, j]);
+        let removed = makeMove2(i, j, player , Board , GameStack)
       let next = player == "X" ? "O" : "X";
-       let scroc = minimax(Board, GameStack, next, aiPlayer, -Infinity, Infinity);
-      Board[i][j] = " ";
-      GameStack.pop();
+      let scroc = minimax(Board, GameStack, next, aiPlayer, map, 20, -Infinity, Infinity);
+      undoStepBack(i , j , removed , Board , GameStack);
       if (scroc > bestScroce) {
         bestScroce = scroc;
         move = [i, j];
@@ -135,41 +163,33 @@ function BestMove(Board, GameStack, player) {
   return move;
 }
 
-function isFull(Board) {
-  for (let i = 0; i < Board.length; i++) {
-    for (let j = 0; j < Board[i].length; j++) {
-      if (Board[i][j] === " ") return false;
-    }
-  }
-  return true;
-}
-
-function minimax(Board, GameStack, currentPlayer, aiPlayer, alpha = -Infinity, beta = Infinity) {
+function minimax(Board, GameStack, currentPlayer, aiPlayer , map , depth = 20, alpha = -Infinity, beta = Infinity) {
 
   if (GameStack.length > 0 && letMeCheck(Board, GameStack)) {
     let [row, col] = GameStack[GameStack.length - 1];
     let last = Board[row][col];
-    return last === aiPlayer ? 1 : -1;
+    return last === aiPlayer ? 10 + depth : -10 - depth;
   }
+  let key = Board.flat().join('') + currentPlayer;
 
-  if (isFull(Board)) return 0;
-
+if(map.has(key)) {
+    return map.get(key);
+} 
+  if (!depth  ) return evaluate(Board);
+  
   let bestScore = currentPlayer === aiPlayer ? -Infinity : Infinity;
+
 
   for (let i = 0; i < Board.length; i++) {
     for (let j = 0; j < Board[i].length; j++) {
 
       if (Board[i][j] !== " ") continue;
-
-      Board[i][j] = currentPlayer;
-      GameStack.push([i, j]);
-
+     let removed = makeMove2(i, j, currentPlayer , Board , GameStack)
       let nextPlayer = currentPlayer === "X" ? "O" : "X";
 
-      let score = minimax(Board, GameStack, nextPlayer, aiPlayer, alpha, beta);
+      let score = minimax(Board, GameStack, nextPlayer, aiPlayer, map , depth - 1, alpha, beta);
+       undoStepBack(i , j , removed , Board , GameStack);
 
-      GameStack.pop();
-      Board[i][j] = " ";
 
       if (currentPlayer === aiPlayer) {
         bestScore = Math.max(bestScore, score);
@@ -181,7 +201,46 @@ function minimax(Board, GameStack, currentPlayer, aiPlayer, alpha = -Infinity, b
 
       if (beta <= alpha) return bestScore;
     }
+    
   }
+  map.set(key, bestScore);  
 
   return bestScore;
+}
+
+
+function evaluate(borad) {
+  let score = 0
+
+  const lines = [
+    [[0, 0], [0, 1], [0, 2]],
+    [[1, 0], [1, 1], [1, 2]],
+    [[2, 0], [2, 1], [2, 2]],
+
+    [[0, 0], [1, 0], [2, 0]],
+    [[0, 1], [1, 1], [2, 1]],
+    [[0, 2], [1, 2], [2, 2]],
+
+    [[0, 0], [1, 1], [2, 2]],
+    [[0, 2], [1, 1], [2, 0]]
+  ];
+
+  for (let line of lines) {
+    let ai = 0;
+    let human = 0;
+    for (let [r, c] of line) {
+      if (borad[r][c] == 'O') ai++;
+if (borad[r][c] == 'X') human++;
+
+    }
+    if (ai > 0 && human > 0) continue;
+
+    if (ai === 2) score += 3;
+    else if (ai === 1) score += 1;
+
+    if (human === 2) score -= 3;
+    else if (human === 1) score -= 1;
+  }
+
+  return score
 }
